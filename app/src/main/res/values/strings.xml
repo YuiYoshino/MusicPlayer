@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">MusicPlayer</string>
+    <string name="txtTitle">NowPlaying:</string>
+    <string name="txtMp3">hoge.mp3</string>
+    <string name="txtPlay">Play</string>
+    <string name="txtPause">Pause</string>
+    <string name="txtStop">Stop</string>
+    <string name="txtSD">SDCard</string>
+
+</resources>
