@@ -6,10 +6,16 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
+import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.media.AudioManager;
+import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
@@ -17,9 +23,15 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -150,10 +162,28 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     mPlayer = new MediaPlayer();
                     mPlayer = MediaPlayer.create(MainActivity.this, Uri.parse(path));
+
+                    ImageView imageView = findViewById(R.id.imgMusic);
+//                    MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
+//                    mediaMetadataRetriever.setDataSource(MainActivity.this, Uri.parse(path));
+//                    byte[] binary = mediaMetadataRetriever.getEmbeddedPicture();
+//                    if (binary != null) {
+//                        imageView.setImageBitmap(BitmapFactory.decodeByteArray(binary, 0, binary.length));
+//                    } else {
+//                        ContentResolver contentResolver = MainActivity.this.getContentResolver();
+//                        try {
+//                            InputStream inputStream = contentResolver.openInputStream(Uri.parse(path));
+//                            Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
+//                            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+//                            imageView.setImageBitmap(bitmap);
+//                        } catch (FileNotFoundException e) {
+//                            imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+//                        }
+//                    }
+
                     SeekBar scrubber  = (SeekBar)findViewById(R.id.seekBar);
                     scrubber.setMax(mPlayer.getDuration());
-
-                    scrubber.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                        scrubber.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                         @Override
                         public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
                             mPlayer.seekTo(i);
