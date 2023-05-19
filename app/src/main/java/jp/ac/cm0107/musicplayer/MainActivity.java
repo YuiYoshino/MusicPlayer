@@ -20,6 +20,8 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -43,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
     Button btnPlay;
     Button btnPause;
     Button btnStop;
+    SeekBar scrubber ;
+    private Thread thread;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -70,6 +74,7 @@ public class MainActivity extends AppCompatActivity {
         btnPause.setOnClickListener(new BtnEvent());
         btnStop = findViewById(R.id.btnStop);
         btnStop.setOnClickListener(new BtnEvent());
+        scrubber  = (SeekBar)findViewById(R.id.seekBar);
 
         audioManager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
         int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
@@ -151,6 +156,23 @@ public class MainActivity extends AppCompatActivity {
             TextView txt = (TextView)findViewById(R.id.txtFileName);
             txt.setText(path);
             Log.i(path, "path: ");
+            ImageView imageView = findViewById(R.id.imgMusic);
+            MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
+            mediaMetadataRetriever.setDataSource(MainActivity.this, Uri.parse(path));
+            byte[] binary = mediaMetadataRetriever.getEmbeddedPicture();
+            if (binary != null) {
+                imageView.setImageBitmap(BitmapFactory.decodeByteArray(binary, 0, binary.length));
+            } else {
+                ContentResolver contentResolver = MainActivity.this.getContentResolver();
+                try {
+                    InputStream inputStream = contentResolver.openInputStream(Uri.parse(path));
+                    Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
+                    imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    imageView.setImageBitmap(bitmap);
+                } catch (FileNotFoundException e) {
+                    imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                }
+            }
         }
     }
     class BtnEvent implements View.OnClickListener {
@@ -163,30 +185,14 @@ public class MainActivity extends AppCompatActivity {
                     mPlayer = new MediaPlayer();
                     mPlayer = MediaPlayer.create(MainActivity.this, Uri.parse(path));
 
-                    ImageView imageView = findViewById(R.id.imgMusic);
-//                    MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
-//                    mediaMetadataRetriever.setDataSource(MainActivity.this, Uri.parse(path));
-//                    byte[] binary = mediaMetadataRetriever.getEmbeddedPicture();
-//                    if (binary != null) {
-//                        imageView.setImageBitmap(BitmapFactory.decodeByteArray(binary, 0, binary.length));
-//                    } else {
-//                        ContentResolver contentResolver = MainActivity.this.getContentResolver();
-//                        try {
-//                            InputStream inputStream = contentResolver.openInputStream(Uri.parse(path));
-//                            Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
-//                            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-//                            imageView.setImageBitmap(bitmap);
-//                        } catch (FileNotFoundException e) {
-//                            imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-//                        }
-//                    }
-
-                    SeekBar scrubber  = (SeekBar)findViewById(R.id.seekBar);
                     scrubber.setMax(mPlayer.getDuration());
                         scrubber.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                         @Override
                         public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                            mPlayer.seekTo(i);
+                            if(b){
+                                mPlayer.seekTo(i);
+                                seekBar.setProgress(i);
+                            }
                         }
 
                         @Override
@@ -226,6 +232,7 @@ public class MainActivity extends AppCompatActivity {
                 setPlayingStateButtons();
             }else if (v.getId()==R.id.btnStop){
                 mPlayer.stop();
+                scrubber.setProgress(0);
                 setDefaultButtons();
             }
         }
@@ -240,4 +247,10 @@ public class MainActivity extends AppCompatActivity {
         btnPause.setEnabled(true);
         btnStop.setEnabled(true);
     }
+    private Handler threadHandler = new Handler() {
+        public void handleMessage(Message msg) {
+            Log.i("MainActivity", "msg.what = " + msg.what);
+            scrubber.setProgress(msg.what);
+        }
+    };
 }
