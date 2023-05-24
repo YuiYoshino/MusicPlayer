@@ -1,5 +1,7 @@
 package jp.ac.cm0107.musicplayer;
 
+import static android.media.AudioManager.STREAM_MUSIC;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -7,11 +9,9 @@ import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.content.ContentResolver;
-import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
@@ -32,8 +32,6 @@ import android.widget.Toast;
 
 import java.io.FileNotFoundException;
 import java.io.InputStream;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -45,8 +43,12 @@ public class MainActivity extends AppCompatActivity {
     Button btnPlay;
     Button btnPause;
     Button btnStop;
-    SeekBar scrubber ;
+    SeekBar seekBar;
+
+    SeekBar volumeController;
     private Thread thread;
+    private Thread threadVol;
+    private int mTotalTime;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -74,31 +76,53 @@ public class MainActivity extends AppCompatActivity {
         btnPause.setOnClickListener(new BtnEvent());
         btnStop = findViewById(R.id.btnStop);
         btnStop.setOnClickListener(new BtnEvent());
-        scrubber  = (SeekBar)findViewById(R.id.seekBar);
+        seekBar = (SeekBar)findViewById(R.id.seekBar);
 
         audioManager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
-        int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        int curVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+        int maxVolume = audioManager.getStreamMaxVolume(STREAM_MUSIC);
+        int curVolume = audioManager.getStreamVolume(STREAM_MUSIC);
 
-        SeekBar volumeController = (SeekBar) findViewById(R.id.seekBarVolume);
+        volumeController = (SeekBar) findViewById(R.id.seekBarVolume);
         volumeController.setMax(maxVolume);
         volumeController.setProgress(curVolume);
-        volumeController.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC,i,0);
-            }
+        try {
+            volumeController.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+                    audioManager.setStreamVolume(STREAM_MUSIC, i, 0);
+                }
 
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {
+                }
 
-            }
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+                }
+            });
+            threadVol = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        while (true){
+                            int streamVolume = audioManager.getStreamVolume(STREAM_MUSIC);
+                            Message msg = new Message();
+                            msg.what = streamVolume;
+//                            Log.i("MainActivity111", "msg.what = " + msg.what);
 
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
+                            threadHandlerVol.sendMessage(msg);
+                            Thread.sleep(100);
+                        }
+                    }catch (InterruptedException e){
+                        e.printStackTrace();
+                    }
+                }
+            });
+            threadVol.start();
+        }catch (Exception e) {
+            Log.e("MainActivity", e.toString());
+        }
 
-            }
-        });
 
 
         Button btnSDList = (Button) findViewById(R.id.btnSDList);
@@ -113,6 +137,13 @@ public class MainActivity extends AppCompatActivity {
                 startActivityForResult(i,SEARCH_REQCD);
             }
         });
+        TextView txt = findViewById(R.id.txtFileName);
+        txt.setText("Storageから曲を選択してください");
+
+        btnPlay.setEnabled(false);
+        btnPause.setEnabled(false);
+        btnStop.setEnabled(false);
+
     }
     @Override
     public void onRequestPermissionsResult(
@@ -142,11 +173,11 @@ public class MainActivity extends AppCompatActivity {
             mPlayer.release();
             mPlayer = null;
         }
+        thread = null;
     }
     @Override
     protected void onResume() {
         super.onResume();
-        setDefaultButtons();
     }
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
@@ -173,6 +204,9 @@ public class MainActivity extends AppCompatActivity {
                     imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
                 }
             }
+            setDefaultButtons();
+            seekBar.setProgress(0);
+            seekBar.setEnabled(true);
         }
     }
     class BtnEvent implements View.OnClickListener {
@@ -185,26 +219,7 @@ public class MainActivity extends AppCompatActivity {
                     mPlayer = new MediaPlayer();
                     mPlayer = MediaPlayer.create(MainActivity.this, Uri.parse(path));
 
-                    scrubber.setMax(mPlayer.getDuration());
-                        scrubber.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                        @Override
-                        public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                            if(b){
-                                mPlayer.seekTo(i);
-                                seekBar.setProgress(i);
-                            }
-                        }
 
-                        @Override
-                        public void onStartTrackingTouch(SeekBar seekBar) {
-
-                        }
-
-                        @Override
-                        public void onStopTrackingTouch(SeekBar seekBar) {
-
-                        }
-                    });
                     mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                         @Override
                         public void onCompletion(MediaPlayer mediaPlayer) {
@@ -213,16 +228,57 @@ public class MainActivity extends AppCompatActivity {
                             setDefaultButtons();
                         }
                     });
+
                     mPlayer.seekTo(0);
                     mPlayer.start();
-                    mPlayer.prepare();
+//                    mPlayer.prepare();
                     setPlayingStateButtons();
+
+
+                    mTotalTime = mPlayer.getDuration();
+                    seekBar.setMax(mTotalTime);
+                    seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                        @Override
+                        public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+                            if(b){
+                                mPlayer.seekTo(i);
+                                seekBar.setProgress(i);
+                                //Log.i("MainActivity","progress = "+ i);
+                            }
+                        }
+                        @Override
+                        public void onStartTrackingTouch(SeekBar seekBar) {
+                        }
+                        @Override
+                        public void onStopTrackingTouch(SeekBar seekBar) {
+                        }
+                    });
+                    thread = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                while (mPlayer != null){
+                                    int currentPosition = mPlayer.getCurrentPosition();
+                                    Message msg = new Message();
+                                    msg.what = currentPosition;
+                                    Log.i("MainActivity111", "msg.what = " + msg.what);
+
+                                    threadHandler.sendMessage(msg);
+                                    Thread.sleep(100);
+                                }
+                            }catch (InterruptedException e){
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+                    thread.start();
                 } catch (Exception e) {
                     Log.e("MainActivity", e.toString());
                 }
                 mPlayer.seekTo(0);
                 mPlayer.start();
                 setPlayingStateButtons();
+
             }else if (v.getId()==R.id.btnPause){
                 if (mPlayer.isPlaying()){
                     mPlayer.pause();
@@ -232,7 +288,7 @@ public class MainActivity extends AppCompatActivity {
                 setPlayingStateButtons();
             }else if (v.getId()==R.id.btnStop){
                 mPlayer.stop();
-                scrubber.setProgress(0);
+                seekBar.setProgress(0);
                 setDefaultButtons();
             }
         }
@@ -249,8 +305,14 @@ public class MainActivity extends AppCompatActivity {
     }
     private Handler threadHandler = new Handler() {
         public void handleMessage(Message msg) {
-            Log.i("MainActivity", "msg.what = " + msg.what);
-            scrubber.setProgress(msg.what);
+            //Log.i("MainActivity", "msg.what = " + msg.what);
+            seekBar.setProgress(msg.what);
+        }
+    };
+    private Handler threadHandlerVol = new Handler() {
+        public void handleMessage(Message msg) {
+            //Log.i("MainActivity", "msg.what = " + msg.what);
+            volumeController.setProgress(msg.what);
         }
     };
 }

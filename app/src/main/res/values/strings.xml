@@ -5,6 +5,6 @@
     <string name="txtPlay">Play</string>
     <string name="txtPause">Pause</string>
     <string name="txtStop">Stop</string>
-    <string name="txtSD">SDCard</string>
+    <string name="txtSD">Storage</string>
 
 </resources>
